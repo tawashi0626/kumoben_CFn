@@ -1,0 +1,117 @@
+AWSTemplateFormatVersion: '2010-09-09'
+
+Parameters:
+
+  VpcCidr:
+    Default: 10.0.0.0/16
+    Type: String
+
+  PublicSubnet1aCidr:
+    Default: 10.0.1.0/24
+    Type: String
+
+  PublicSubnet1cCidr:
+    Default: 10.0.3.0/24
+    Type: String
+
+Resources:
+# Create VPC
+  Vpc:
+    Type: AWS::EC2::VPC
+    Properties:
+      CidrBlock: !Ref VpcCidr
+      EnableDnsSupport: 'true'
+      EnableDnsHostnames: 'true'
+      InstanceTenancy: default
+      Tags:
+      - Key: Name
+        Value: !Ref AWS::StackName
+
+# Create Public Subnet A
+  PublicSubnet1a:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref Vpc
+      CidrBlock: !Ref PublicSubnet1aCidr
+      MapPublicIpOnLaunch: 'true'
+      AvailabilityZone: ap-northeast-1a
+      Tags:
+      - Key: Name
+        Value: !Sub ${AWS::StackName}-public1a
+
+# Create Public Subnet C
+  PublicSubnet1c:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref Vpc
+      CidrBlock: !Ref PublicSubnet1cCidr
+      MapPublicIpOnLaunch: 'true'
+      AvailabilityZone: ap-northeast-1c
+      Tags:
+      - Key: Name
+        Value: !Sub ${AWS::StackName}-public1c
+
+# Create InternetGateway
+  InternetGateway:
+    Type: AWS::EC2::InternetGateway
+    Properties:
+      Tags:
+      - Key: Name
+        Value: !Sub ${AWS::StackName}-igw
+
+# InternetGateway VPCattach
+  InternetGatewayAttach:
+    Type: AWS::EC2::VPCGatewayAttachment
+    Properties:
+      VpcId: !Ref Vpc
+      InternetGatewayId: !Ref InternetGateway
+
+# Create RouteTable
+  RouteTablePublic:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      VpcId: !Ref Vpc
+      Tags:
+      - Key: Name
+        Value: !Sub ${AWS::StackName}-rt-public
+
+# RouteTable PublicRoute
+  PublicRoute:
+    Type: AWS::EC2::Route
+    Properties:
+      RouteTableId: !Ref RouteTablePublic
+      DestinationCidrBlock: 0.0.0.0/0
+      GatewayId: !Ref InternetGateway
+
+# RouteTable Association Subnet A
+  RouteTableAssociationPublicSubnet1:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      SubnetId: !Ref PublicSubnet1a
+      RouteTableId: !Ref RouteTablePublic
+
+# RouteTable Association Subnet C
+  RouteTableAssociationPublicSubnet2:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      SubnetId: !Ref PublicSubnet1c
+      RouteTableId: !Ref RouteTablePublic
+
+Outputs:
+  VpcId:
+    Description: VPC ID
+    Value: !Ref Vpc
+    Export:
+      Name: !Ref AWS::StackName
+
+  PublicSubnet1aId:
+    Description: PublicSubnet1a ID
+    Value: !Ref PublicSubnet1a
+    Export:
+      Name: !Sub ${AWS::StackName}-public1a
+
+  PublicSubnet1cId:
+    Description: PublicSubnet1c ID
+    Value: !Ref PublicSubnet1c
+    Export:
+      Name: !Sub ${AWS::StackName}-public1c

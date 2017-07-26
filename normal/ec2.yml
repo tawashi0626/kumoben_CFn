@@ -1,0 +1,79 @@
+AWSTemplateFormatVersion: '2010-09-09'
+
+Parameters:
+  KeyName:
+    Description: EC2 Keyname
+    Type: AWS::EC2::KeyPair::KeyName
+
+  Env:
+    Default: cf
+    Type: String
+
+  ImageId:
+    Description: AMI Image ID
+    Default: ami-3bd3c45c
+    Type: String
+
+  InstanceType:
+    Description: Instance Type
+    Type: String
+    Default: t2.micro
+
+  VolumeSize:
+    Default: 10
+    Type: Number
+
+  VolumeType:
+    Default: gp2
+    Type: String
+
+Resources:
+  Ec2Web:
+    Type: AWS::EC2::Instance
+    Properties:
+      ImageId: !Ref ImageId
+      InstanceType: !Ref InstanceType
+      KeyName: !Ref KeyName
+      BlockDeviceMappings:
+      - DeviceName: /dev/xvda
+        Ebs:
+          VolumeSize: !Ref VolumeSize
+          VolumeType: !Ref VolumeType
+          DeleteOnTermination: 'true'
+      SubnetId:
+        Fn::ImportValue: !Sub ${Env}-vpc-public1a
+      SecurityGroupIds:
+      - Fn::ImportValue: !Sub ${Env}-sg-web
+      - Fn::ImportValue: !Sub ${Env}-sg-admin
+      Tags:
+      - Key: Name
+        Value: !Sub ${Env}-web01
+      UserData:
+        Fn::Base64: |
+          #!/bin/bash
+          yum install -y httpd
+          echo "Welcome to Kumoben" > /var/www/html/index.html
+          /etc/init.d/httpd start
+
+  Elb:
+    Type: AWS::ElasticLoadBalancing::LoadBalancer
+    Properties:
+      LoadBalancerName: !Sub ${Env}-web-elb
+      CrossZone: true
+      Subnets:
+      - Fn::ImportValue: !Sub ${Env}-vpc-public1a
+      - Fn::ImportValue: !Sub ${Env}-vpc-public1c
+      SecurityGroups:
+      - Fn::ImportValue: !Sub ${Env}-sg-elb
+      Listeners:
+      - LoadBalancerPort: '80'
+        InstancePort: '80'
+        Protocol: HTTP
+      HealthCheck:
+        Target: TCP:80
+        HealthyThreshold: '3'
+        UnhealthyThreshold: '2'
+        Interval: '30'
+        Timeout: '5'
+      Instances:
+      - Ref: Ec2Web

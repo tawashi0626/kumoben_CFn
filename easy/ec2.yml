@@ -1,0 +1,57 @@
+AWSTemplateFormatVersion: '2010-09-09'
+
+Parameters:
+  KeyName:
+    Description: EC2 Keyname
+    Type: AWS::EC2::KeyPair::KeyName
+
+Resources:
+  Ec2Web:
+    Type: AWS::EC2::Instance
+    Properties:
+      ImageId: ami-3bd3c45c
+      InstanceType: t2.micro
+      KeyName: !Ref KeyName
+      BlockDeviceMappings:
+      - DeviceName: /dev/xvda
+        Ebs:
+          VolumeSize: 10
+          VolumeType: gp2
+          DeleteOnTermination: 'true'
+      SubnetId: xxxxxx
+      SecurityGroupIds:
+      - xxxxxx
+      - xxxxxx
+      Tags:
+      - Key: Name
+        Value: cf-web01
+      UserData:
+        Fn::Base64: |
+          #!/bin/bash
+          yum install -y httpd
+          echo "Welcome to Kumoben" > /var/www/html/index.html
+          /etc/init.d/httpd start
+
+# 追記
+  Elb:
+    Type: AWS::ElasticLoadBalancing::LoadBalancer
+    Properties:
+      LoadBalancerName: cf-web-elb
+      CrossZone: true
+      Subnets:
+      - xxxxxx
+      - xxxxxx
+      SecurityGroups:
+      - xxxxxx
+      Listeners:
+      - LoadBalancerPort: '80'
+        InstancePort: '80'
+        Protocol: HTTP
+      HealthCheck:
+        Target: TCP:80
+        HealthyThreshold: '3'
+        UnhealthyThreshold: '2'
+        Interval: '30'
+        Timeout: '5'
+      Instances:
+      - Ref: Ec2Web
